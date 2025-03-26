@@ -109,7 +109,7 @@ async function loadAllStats() {
           "LF Endesa",
           "LF Challenge",
           "L.F. 2",
-          "Minicopa LF Endesa",
+          "MINICOPA LF ENDESA",
           "CE SSAA Cadete Fem.",
           "CE SSA Infantil Fem."
         ];
