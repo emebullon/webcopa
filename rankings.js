@@ -12,61 +12,88 @@ let currentPage = 1;
 const itemsPerPage = 50;
 
 /***************************************
- * DOMContentLoaded
+ * Funciones de Responsividad
  ***************************************/
-document.addEventListener("DOMContentLoaded", () => {
-  loadAllStats();
-
-  document.getElementById("btnApplyFilters").addEventListener("click", () => {
-    currentPage = 1;
-    applyFilters();
-  });
-
-  // Ordenar al hacer clic en cada <th>
-  const ths = document.querySelectorAll("#statsTable thead th");
-  ths.forEach(th => {
-    th.addEventListener("click", () => {
-      const colKey = th.dataset.col;
-      if (colKey) {
-        sortByColumn(colKey);
+function setupMobileColumns() {
+  const toggleButton = document.getElementById('toggleColumns');
+  const tableContainer = document.querySelector('.stats-table-container');
+  
+  if (toggleButton && tableContainer) {
+    toggleButton.addEventListener('click', () => {
+      tableContainer.classList.toggle('mobile-all-columns');
+      
+      // Actualizar el texto del botón
+      if (tableContainer.classList.contains('mobile-all-columns')) {
+        toggleButton.textContent = 'Mostrar datos básicos';
+        // Ajustar el scroll para mostrar las estadísticas adicionales
+        setTimeout(() => {
+          tableContainer.scrollLeft = 0;
+        }, 100);
+      } else {
+        toggleButton.textContent = 'Mostrar más datos';
+        // Resetear el scroll cuando volvemos a la vista básica
+        tableContainer.scrollLeft = 0;
       }
     });
-  });
 
-  // Toggle Totales/Promedios
-  const modeToggle = document.getElementById("modeToggle");
-  if (modeToggle) {
-    modeToggle.addEventListener("change", () => {
-      currentPage = 1;
-      applyFilters();
+    // Añadir indicador de scroll
+    const scrollIndicator = document.createElement('div');
+    scrollIndicator.className = 'scroll-indicator';
+    tableContainer.appendChild(scrollIndicator);
+
+    // Mostrar/ocultar indicador de scroll según sea necesario
+    tableContainer.addEventListener('scroll', () => {
+      const maxScroll = tableContainer.scrollWidth - tableContainer.clientWidth;
+      if (tableContainer.classList.contains('mobile-all-columns')) {
+        scrollIndicator.style.opacity = tableContainer.scrollLeft < maxScroll ? '1' : '0';
+      } else {
+        scrollIndicator.style.opacity = '0';
+      }
     });
   }
+}
 
-  // Búsqueda en tiempo real
-  const searchInput = document.getElementById("searchPlayerTeam");
-  searchInput.addEventListener("input", () => {
-    currentPage = 1;
-    applyFilters();
-  });
+function setupMobileMenu() {
+  const menuToggle = document.getElementById('menuToggle');
+  const mainNav = document.querySelector('.main-nav');
+  const body = document.body;
 
-  // Botones de paginación
-  document.getElementById("prevPageBtn").addEventListener("click", () => {
-    if (currentPage > 1) {
-      currentPage--;
-      applyFilters();
-    }
-  });
-  document.getElementById("nextPageBtn").addEventListener("click", () => {
-    currentPage++;
-    applyFilters();
-  });
-});
+  const overlay = document.createElement('div');
+  overlay.className = 'overlay';
+  body.appendChild(overlay);
+
+  if (menuToggle && mainNav) {
+    menuToggle.addEventListener('click', () => {
+      menuToggle.classList.toggle('active');
+      mainNav.classList.toggle('active');
+      overlay.classList.toggle('active');
+      body.style.overflow = mainNav.classList.contains('active') ? 'hidden' : '';
+    });
+
+    overlay.addEventListener('click', () => {
+      menuToggle.classList.remove('active');
+      mainNav.classList.remove('active');
+      overlay.classList.remove('active');
+      body.style.overflow = '';
+    });
+
+    const navLinks = mainNav.querySelectorAll('a');
+    navLinks.forEach(link => {
+      link.addEventListener('click', () => {
+        menuToggle.classList.remove('active');
+        mainNav.classList.remove('active');
+        overlay.classList.remove('active');
+        body.style.overflow = '';
+      });
+    });
+  }
+}
 
 /***************************************
- * 1) OBTENER LISTA DE JSON DESDE GITHUB
+ * Funciones principales
  ***************************************/
 async function fetchMatchFiles() {
-  const apiUrl = "https://api.github.com/repos/emebullon/copa/contents/";
+  const apiUrl = "https://api.github.com/repos/emebullon/mini2025/contents/";
   try {
     const response = await fetch(apiUrl);
     const files = await response.json();
@@ -77,9 +104,6 @@ async function fetchMatchFiles() {
   }
 }
 
-/***************************************
- * 2) CARGAR Y ACUMULAR ESTADÍSTICAS CON DETALLES DE PARTIDOS
- ***************************************/
 async function loadAllStats() {
   const urls = await fetchMatchFiles();
   const playersMap = new Map();
@@ -93,7 +117,6 @@ async function loadAllStats() {
 
       const matchDate = data.HEADER.starttime || "";
       const scoreboardTeams = data.SCOREBOARD.TEAM;
-      // Asumimos que scoreboardTeams[0] y [1] son los dos equipos
       const teamAName = scoreboardTeams[0].name || "Equipo A";
       const teamBName = scoreboardTeams[1].name || "Equipo B";
 
@@ -101,15 +124,12 @@ async function loadAllStats() {
         const teamName = teamObj.name || "Equipo X";
         teamSet.add(teamName);
 
-        // Determinar equipo rival
         const rivalName = (index === 0) ? teamBName : teamAName;
 
-        // Género
         const femaleCompetitions = [
           "LF Endesa",
           "LF Challenge",
           "L.F. 2",
-          "MINICOPA LF ENDESA",
           "CE SSAA Cadete Fem.",
           "CE SSA Infantil Fem."
         ];
@@ -177,14 +197,12 @@ async function loadAllStats() {
           record.va += parseInt(player.val || 0);
           record.pm += parseInt(player.pllss || 0);
 
-          // Calcular porcentajes para este partido
           const pct2 = (p2a > 0) ? ((p2m / p2a) * 100).toFixed(1) : "0.0";
           const pct3 = (p3a > 0) ? ((p3m / p3a) * 100).toFixed(1) : "0.0";
           const pctTl = (p1a > 0) ? ((p1m / p1a) * 100).toFixed(1) : "0.0";
 
-          // Agregar detalle del partido
           record.matches.push({
-            matchDate,  // Fecha del partido
+            matchDate,
             rival: rivalName,
             pts: parseInt(player.pts || 0),
             t2i: p2a,
@@ -219,9 +237,6 @@ async function loadAllStats() {
   applyFilters();
 }
 
-/***************************************
- * 3) LLENAR SELECTS
- ***************************************/
 function fillSelects() {
   const filterCompetition = document.getElementById("filterCompetition");
   const filterTeam = document.getElementById("filterTeam");
@@ -241,174 +256,145 @@ function fillSelects() {
   });
 }
 
-/***************************************
- * 4) APLICAR FILTROS + PAGINACIÓN
- ***************************************/
 function applyFilters() {
   const compSel = document.getElementById("filterCompetition").value;
   const teamSel = document.getElementById("filterTeam").value;
   const genderSel = document.getElementById("filterGender").value;
   const modeToggle = document.getElementById("modeToggle");
-  const mode = modeToggle.checked ? "promedios" : "totales";
-  const searchText = document.getElementById("searchPlayerTeam").value.toLowerCase();
+  const searchInput = document.getElementById("searchPlayerTeam");
+  const searchTerm = searchInput.value.toLowerCase();
 
-  let filtered = allPlayersStats.filter(p => {
-    if (compSel && p.competition !== compSel) return false;
-    if (teamSel && p.teamName !== teamSel) return false;
-    if (genderSel && p.gender !== genderSel) return false;
-    if (searchText) {
-      const nameMatch = p.playerName.toLowerCase().includes(searchText);
-      const teamMatch = p.teamName.toLowerCase().includes(searchText);
-      if (!nameMatch && !teamMatch) return false;
-    }
-    return true;
+  let filteredData = allPlayersStats.filter(player => {
+    const matchesComp = !compSel || player.competition === compSel;
+    const matchesTeam = !teamSel || player.teamName === teamSel;
+    const matchesGender = !genderSel || player.gender === genderSel;
+    const matchesSearch = !searchTerm || 
+      player.playerName.toLowerCase().includes(searchTerm) || 
+      player.teamName.toLowerCase().includes(searchTerm);
+
+    return matchesComp && matchesTeam && matchesGender && matchesSearch;
   });
 
   if (currentSortCol) {
-    sortArray(filtered, currentSortCol, currentSortOrder, mode);
+    filteredData = sortArray(filteredData, currentSortCol, currentSortOrder, modeToggle.checked ? "promedios" : "totales");
   }
 
-  // PAGINACIÓN
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
-  const paginated = filtered.slice(startIndex, endIndex);
+  const paginatedData = filteredData.slice(startIndex, endIndex);
 
-  renderTable(paginated, mode);
-
-  // Actualizar info de paginación
-  const pageInfo = document.getElementById("pageInfo");
-  const totalPages = Math.ceil(filtered.length / itemsPerPage);
-  if (totalPages === 0) {
-    pageInfo.textContent = "No hay datos";
-  } else {
-    pageInfo.textContent = `Página ${currentPage} / ${totalPages}`;
-    if (currentPage > totalPages) {
-      currentPage = totalPages;
-      applyFilters();
-    }
-  }
+  renderTable(paginatedData, modeToggle.checked ? "promedios" : "totales");
+  updatePaginationInfo(filteredData.length);
 }
 
-/***************************************
- * 5) RENDERIZAR TABLA CON EXPANSIÓN DE DETALLES
- ***************************************/
 function limitName(name, maxChars = 15) {
-  if (name.length <= maxChars) return name;
-  return name.slice(0, maxChars - 1) + "…";
+  return name.length > maxChars ? name.substring(0, maxChars) + "..." : name;
 }
 
-// Función para obtener las iniciales del equipo
 function getInitials(name) {
-  return name
-    .split(" ")
-    .filter(word => word.length > 0)
-    .map(word => word[0])
-    .join("")
-    .toUpperCase();
+  return name.split(" ").map(word => word[0]).join("");
 }
 
 function renderTable(data, mode = "totales") {
   const tbody = document.querySelector("#statsTable tbody");
   tbody.innerHTML = "";
 
-  data.forEach((p, idx) => {
-    const factor = (mode === "promedios") ? (1 / (p.games || 1)) : 1;
+  data.forEach((player, index) => {
+    const row = document.createElement("tr");
+    const rank = (currentPage - 1) * itemsPerPage + index + 1;
 
-    const pts = Math.round(p.pts * factor);
-    const t2i = Math.round(p.t2i * factor);
-    const t2c = Math.round(p.t2c * factor);
-    const t3i = Math.round(p.t3i * factor);
-    const t3c = Math.round(p.t3c * factor);
-    const tli = Math.round(p.tli * factor);
-    const tlc = Math.round(p.tlc * factor);
-    const ro = Math.round(p.ro * factor);
-    const rd = Math.round(p.rd * factor);
-    const rt = Math.round(p.rt * factor);
-    const as = Math.round(p.as * factor);
-    const br = Math.round(p.br * factor);
-    const bp = Math.round(p.bp * factor);
-    const tp = Math.round(p.tp * factor);
-    const fc = Math.round(p.fc * factor);
-    const va = Math.round(p.va * factor);
-    const pm = Math.round(p.pm * factor);
+    // Calcular los valores que se mostrarán
+    const pts = mode === "totales" ? player.pts : (player.pts / player.games).toFixed(1);
+    const t2c = mode === "totales" ? player.t2c : (player.t2c / player.games).toFixed(1);
+    const t2i = mode === "totales" ? player.t2i : (player.t2i / player.games).toFixed(1);
+    const t3c = mode === "totales" ? player.t3c : (player.t3c / player.games).toFixed(1);
+    const t3i = mode === "totales" ? player.t3i : (player.t3i / player.games).toFixed(1);
+    const tlc = mode === "totales" ? player.tlc : (player.tlc / player.games).toFixed(1);
+    const tli = mode === "totales" ? player.tli : (player.tli / player.games).toFixed(1);
+    const ro = mode === "totales" ? player.ro : (player.ro / player.games).toFixed(1);
+    const rd = mode === "totales" ? player.rd : (player.rd / player.games).toFixed(1);
+    const rt = mode === "totales" ? player.rt : (player.rt / player.games).toFixed(1);
+    const as = mode === "totales" ? player.as : (player.as / player.games).toFixed(1);
+    const br = mode === "totales" ? player.br : (player.br / player.games).toFixed(1);
+    const bp = mode === "totales" ? player.bp : (player.bp / player.games).toFixed(1);
+    const tp = mode === "totales" ? player.tp : (player.tp / player.games).toFixed(1);
+    const fc = mode === "totales" ? player.fc : (player.fc / player.games).toFixed(1);
+    const va = mode === "totales" ? player.va : (player.va / player.games).toFixed(1);
+    const pm = mode === "totales" ? player.pm : (player.pm / player.games).toFixed(1);
 
-    const pct2 = t2i > 0 ? ((t2c / t2i) * 100).toFixed(1) + "%" : "0%";
-    const pct3 = t3i > 0 ? ((t3c / t3i) * 100).toFixed(1) + "%" : "0%";
-    const pctTl = tli > 0 ? ((tlc / tli) * 100).toFixed(1) + "%" : "0%";
+    // Calcular porcentajes
+    const pct2 = player.t2i > 0 ? ((player.t2c / player.t2i) * 100).toFixed(1) : "0.0";
+    const pct3 = player.t3i > 0 ? ((player.t3c / player.t3i) * 100).toFixed(1) : "0.0";
+    const pctTl = player.tli > 0 ? ((player.tlc / player.tli) * 100).toFixed(1) : "0.0";
 
-    const shortName = limitName(p.playerName, 15);
-    // Para el equipo, mostramos solo las iniciales y en hover se muestra el nombre completo
-    const teamInitials = getInitials(p.teamName);
+    // Abreviar nombre del equipo
+    const teamName = player.teamName;
+    const shortTeamName = teamName.length > 3 ? teamName.substring(0, 3) : teamName;
 
-    const tr = document.createElement("tr");
-    tr.innerHTML = `
-      <td>${idx + 1}</td>
-      <td>${p.dorsal}</td>
-      <td><img src="${p.playerPhoto}" style="width:30px; height:30px; border-radius:50%; object-fit:cover;" /></td>
-      <td data-col="playerName">${shortName}</td>
-      <td title="${p.teamName}">${teamInitials}</td>
-      <td>${pts}</td>
-      <td>${t2i}</td>
-      <td>${t2c}</td>
-      <td>${pct2}</td>
-      <td>${t3i}</td>
-      <td>${t3c}</td>
-      <td>${pct3}</td>
-      <td>${tli}</td>
-      <td>${tlc}</td>
-      <td>${pctTl}</td>
-      <td>${ro}</td>
-      <td>${rd}</td>
-      <td>${rt}</td>
-      <td>${as}</td>
-      <td>${br}</td>
-      <td>${bp}</td>
-      <td>${tp}</td>
-      <td>${fc}</td>
-      <td>${va}</td>
-      <td>${pm >= 0 ? "+" + pm : pm}</td>
-      <td class="games-cell" style="cursor: pointer;" data-player-id="${p.playerId || idx}">${p.games}</td>
+    row.innerHTML = `
+      <td>${rank}</td>
+      <td>${player.dorsal}</td>
+      <td><img src="${player.playerPhoto}" alt="${player.playerName}" class="player-photo"></td>
+      <td data-col="playerName">${limitName(player.playerName)}</td>
+      <td class="team-name" data-fullname="${teamName}">${shortTeamName}</td>
+      <td data-col="pts">${pts}</td>
+      <td data-col="t2c">${t2c}</td>
+      <td data-col="t2i">${t2i}</td>
+      <td data-col="pct2">${pct2}</td>
+      <td data-col="t3c">${t3c}</td>
+      <td data-col="t3i">${t3i}</td>
+      <td data-col="pct3">${pct3}</td>
+      <td data-col="tlc">${tlc}</td>
+      <td data-col="tli">${tli}</td>
+      <td data-col="pctTl">${pctTl}</td>
+      <td data-col="ro">${ro}</td>
+      <td data-col="rd">${rd}</td>
+      <td data-col="rt">${rt}</td>
+      <td data-col="as">${as}</td>
+      <td data-col="br">${br}</td>
+      <td data-col="bp">${bp}</td>
+      <td data-col="tp">${tp}</td>
+      <td data-col="fc">${fc}</td>
+      <td data-col="va">${va}</td>
+      <td data-col="pm">${pm}</td>
+      <td class="games-cell" onclick="toggleMatchDetails(this, ${JSON.stringify(player).replace(/"/g, '&quot;')})">${player.games}</td>
     `;
-    // Listener para desplegar detalles al hacer clic en "Part." (celda de partidos)
-    tr.querySelector(".games-cell").addEventListener("click", function() {
-      toggleMatchDetails(this, p);
-    });
 
-    tbody.appendChild(tr);
+    tbody.appendChild(row);
   });
 }
 
-/**
- * Alterna la fila de detalles con los partidos
- */
 function toggleMatchDetails(cell, player) {
-  const currentRow = cell.parentNode;
-  const nextRow = currentRow.nextElementSibling;
+  const row = cell.parentElement;
+  const nextRow = row.nextElementSibling;
+
   if (nextRow && nextRow.classList.contains("details-row")) {
     nextRow.remove();
-    return;
-  }
-  
-  const detailsRow = document.createElement("tr");
-  detailsRow.classList.add("details-row");
-  const detailsCell = document.createElement("td");
-  detailsCell.colSpan = currentRow.children.length;
-
-  let subTableHTML = `<table class="match-details-table">
-    <thead>
+  } else {
+    const detailsRow = document.createElement("tr");
+    detailsRow.className = "details-row";
+    
+    const detailsCell = document.createElement("td");
+    detailsCell.colSpan = 26;
+    
+    const detailsTable = document.createElement("table");
+    detailsTable.className = "match-details-table";
+    
+    const thead = document.createElement("thead");
+    thead.innerHTML = `
       <tr>
         <th>Fecha</th>
         <th>Rival</th>
         <th>PTS</th>
-        <th>T2I</th>
         <th>T2C</th>
-        <th>T2%</th>
-        <th>T3I</th>
+        <th>T2I</th>
+        <th>%T2</th>
         <th>T3C</th>
-        <th>T3%</th>
-        <th>TLI</th>
+        <th>T3I</th>
+        <th>%T3</th>
         <th>TLC</th>
-        <th>TL%</th>
+        <th>TLI</th>
+        <th>%TL</th>
         <th>RO</th>
         <th>RD</th>
         <th>RT</th>
@@ -420,124 +406,154 @@ function toggleMatchDetails(cell, player) {
         <th>VA</th>
         <th>+/-</th>
       </tr>
-    </thead>
-    <tbody>`;
-  
-  if (player.matches && player.matches.length > 0) {
+    `;
+    
+    const tbody = document.createElement("tbody");
     player.matches.forEach(match => {
-      subTableHTML += `
-        <tr>
-          <td>${match.matchDate}</td>
-          <td>${match.rival}</td>
-          <td>${match.pts}</td>
-          <td>${match.t2i}</td>
-          <td>${match.t2c}</td>
-          <td>${match.pct2}</td>
-          <td>${match.t3i}</td>
-          <td>${match.t3c}</td>
-          <td>${match.pct3}</td>
-          <td>${match.tli}</td>
-          <td>${match.tlc}</td>
-          <td>${match.pctTl}</td>
-          <td>${match.ro}</td>
-          <td>${match.rd}</td>
-          <td>${match.rt}</td>
-          <td>${match.as}</td>
-          <td>${match.br}</td>
-          <td>${match.bp}</td>
-          <td>${match.tp}</td>
-          <td>${match.fc}</td>
-          <td>${match.va}</td>
-          <td>${match.pm >= 0 ? "+" + match.pm : match.pm}</td>
-        </tr>
+      const matchRow = document.createElement("tr");
+      matchRow.innerHTML = `
+        <td>${match.matchDate}</td>
+        <td>${match.rival}</td>
+        <td>${match.pts}</td>
+        <td>${match.t2c}</td>
+        <td>${match.t2i}</td>
+        <td>${match.pct2}</td>
+        <td>${match.t3c}</td>
+        <td>${match.t3i}</td>
+        <td>${match.pct3}</td>
+        <td>${match.tlc}</td>
+        <td>${match.tli}</td>
+        <td>${match.pctTl}</td>
+        <td>${match.ro}</td>
+        <td>${match.rd}</td>
+        <td>${match.rt}</td>
+        <td>${match.as}</td>
+        <td>${match.br}</td>
+        <td>${match.bp}</td>
+        <td>${match.tp}</td>
+        <td>${match.fc}</td>
+        <td>${match.va}</td>
+        <td>${match.pm}</td>
       `;
+      tbody.appendChild(matchRow);
     });
-  } else {
-    subTableHTML += `<tr><td colspan="22">No hay detalles disponibles</td></tr>`;
+    
+    detailsTable.appendChild(thead);
+    detailsTable.appendChild(tbody);
+    detailsCell.appendChild(detailsTable);
+    detailsRow.appendChild(detailsCell);
+    row.parentNode.insertBefore(detailsRow, nextRow);
   }
-  subTableHTML += `</tbody></table>`;
-  
-  detailsCell.innerHTML = subTableHTML;
-  detailsRow.appendChild(detailsCell);
-  currentRow.parentNode.insertBefore(detailsRow, currentRow.nextElementSibling);
 }
 
-/***************************************
- * 6) ORDENAR Y RESALTAR COLUMNA
- ***************************************/
 function sortByColumn(colKey) {
   if (currentSortCol === colKey) {
-    currentSortOrder = (currentSortOrder === "asc") ? "desc" : "asc";
+    currentSortOrder = currentSortOrder === "asc" ? "desc" : "asc";
   } else {
     currentSortCol = colKey;
     currentSortOrder = "desc";
   }
-  currentPage = 1;
+
+  const modeToggle = document.getElementById("modeToggle");
+  allPlayersStats = sortArray(
+    allPlayersStats,
+    colKey,
+    currentSortOrder,
+    modeToggle.checked ? "promedios" : "totales"
+  );
+
+  highlightSortedColumn(colKey);
   applyFilters();
 }
 
 function sortArray(array, colKey, order, mode) {
-  array.sort((a, b) => {
-    const valA = getSortValue(a, colKey, mode);
-    const valB = getSortValue(b, colKey, mode);
-    if (typeof valA === "number" && typeof valB === "number") {
-      return (order === "asc") ? (valA - valB) : (valB - valA);
+  return [...array].sort((a, b) => {
+    const aValue = getSortValue(a, colKey, mode);
+    const bValue = getSortValue(b, colKey, mode);
+
+    if (order === "asc") {
+      return aValue > bValue ? 1 : -1;
     } else {
-      const sA = valA.toString().toLowerCase();
-      const sB = valB.toString().toLowerCase();
-      if (sA < sB) return (order === "asc") ? -1 : 1;
-      if (sA > sB) return (order === "asc") ? 1 : -1;
-      return 0;
+      return aValue < bValue ? 1 : -1;
     }
   });
-  highlightSortedColumn(colKey);
 }
 
 function getSortValue(obj, colKey, mode) {
-  const factor = (mode === "promedios") ? (1 / (obj.games || 1)) : 1;
-  if (colKey === "pts") return obj.pts * factor;
-  if (colKey === "t2i") return obj.t2i * factor;
-  if (colKey === "t2c") return obj.t2c * factor;
-  if (colKey === "t3i") return obj.t3i * factor;
-  if (colKey === "t3c") return obj.t3c * factor;
-  if (colKey === "tli") return obj.tli * factor;
-  if (colKey === "tlc") return obj.tlc * factor;
-  if (colKey === "ro") return obj.ro * factor;
-  if (colKey === "rd") return obj.rd * factor;
-  if (colKey === "rt") return obj.rt * factor;
-  if (colKey === "as") return obj.as * factor;
-  if (colKey === "br") return obj.br * factor;
-  if (colKey === "bp") return obj.bp * factor;
-  if (colKey === "tp") return obj.tp * factor;
-  if (colKey === "fc") return obj.fc * factor;
-  if (colKey === "va") return obj.va * factor;
-  if (colKey === "pm") return obj.pm * factor;
-
-  if (colKey === "pct2") return (obj.t2i > 0) ? (obj.t2c / obj.t2i) * 100 : 0;
-  if (colKey === "pct3") return (obj.t3i > 0) ? (obj.t3c / obj.t3i) * 100 : 0;
-  if (colKey === "pctTl") return (obj.tli > 0) ? (obj.tlc / obj.tli) * 100 : 0;
-  
-  if (colKey === "playerPhoto") return obj.playerPhoto;
-  
-  return obj[colKey] || 0;
+  if (mode === "promedios" && obj.games > 0) {
+    return obj[colKey] / obj.games;
+  }
+  return obj[colKey];
 }
 
 function highlightSortedColumn(colKey) {
   const ths = document.querySelectorAll("#statsTable thead th");
-  ths.forEach(th => th.classList.remove("sorted-col"));
-  const tds = document.querySelectorAll("#statsTable tbody td");
-  tds.forEach(td => td.classList.remove("sorted-col"));
-
-  const targetTh = document.querySelector(`#statsTable thead th[data-col="${colKey}"]`);
-  if (!targetTh) return;
-  targetTh.classList.add("sorted-col");
-
-  const colIndex = Array.from(targetTh.parentNode.children).indexOf(targetTh);
-  const rows = document.querySelectorAll("#statsTable tbody tr");
-  rows.forEach(row => {
-    const cell = row.children[colIndex];
-    if (cell) {
-      cell.classList.add("sorted-col");
+  ths.forEach(th => {
+    th.classList.remove("sorted-asc", "sorted-desc");
+    if (th.dataset.col === colKey) {
+      th.classList.add(currentSortOrder === "asc" ? "sorted-asc" : "sorted-desc");
     }
   });
 }
+
+function updatePaginationInfo(totalItems) {
+  const totalPages = Math.ceil(totalItems / itemsPerPage);
+  const pageInfo = document.getElementById("pageInfo");
+  pageInfo.textContent = `Página ${currentPage} de ${totalPages}`;
+
+  const prevBtn = document.getElementById("prevPageBtn");
+  const nextBtn = document.getElementById("nextPageBtn");
+
+  prevBtn.disabled = currentPage === 1;
+  nextBtn.disabled = currentPage === totalPages;
+}
+
+/***************************************
+ * Inicialización
+ ***************************************/
+document.addEventListener("DOMContentLoaded", () => {
+  setupMobileMenu();
+  setupMobileColumns();
+  loadAllStats();
+
+  document.getElementById("btnApplyFilters").addEventListener("click", () => {
+    currentPage = 1;
+    applyFilters();
+  });
+
+  const ths = document.querySelectorAll("#statsTable thead th");
+  ths.forEach(th => {
+    th.addEventListener("click", () => {
+      const colKey = th.dataset.col;
+      if (colKey) {
+        sortByColumn(colKey);
+      }
+    });
+  });
+
+  const modeToggle = document.getElementById("modeToggle");
+  if (modeToggle) {
+    modeToggle.addEventListener("change", () => {
+      currentPage = 1;
+      applyFilters();
+    });
+  }
+
+  const searchInput = document.getElementById("searchPlayerTeam");
+  searchInput.addEventListener("input", () => {
+    currentPage = 1;
+    applyFilters();
+  });
+
+  document.getElementById("prevPageBtn").addEventListener("click", () => {
+    if (currentPage > 1) {
+      currentPage--;
+      applyFilters();
+    }
+  });
+
+  document.getElementById("nextPageBtn").addEventListener("click", () => {
+    currentPage++;
+    applyFilters();
+  });
+}); 
